@@ -27,7 +27,7 @@ const config = {
     play: false,
     publish: false,
     secret: 'nodemedia2017privatekey'
-  },
+  }
 };
 
 

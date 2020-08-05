@@ -97,7 +97,7 @@ ffmpeg -re -i INPUT_FILE_NAME -c copy -f flv rtmp://localhost/live/STREAM_NAME
 
 Or if you have a video file that is encoded in other audio/video format:
 ```bash
-ffmpeg -re -i INPUT_FILE_NAME -c:v libx264 -preset superfast -tune zerolatency -c:a aac -ar 44100 -f flv rtmp://localhost/live/STREAM_NAME
+ffmpeg -re -i INPUT_FILE_NAME -c:v libx264 -preset veryfast -tune zerolatency -c:a aac -ar 44100 -f flv rtmp://localhost/live/STREAM_NAME
 ```
 
 ## From OBS
@@ -586,7 +586,7 @@ const config = {
       {
         app: 'live',
         mp4: true,
-        mp4Flags: '[movflags=faststart]',
+        mp4Flags: '[movflags=frag_keyframe+empty_moov]',
       }
     ]
   }
@@ -663,6 +663,63 @@ relay: {
 }
 ```
 
+# Fission
+Real-time transcoding multi-resolution output
+![fission](https://raw.githubusercontent.com/illuspas/resources/master/img/admin_panel_fission.png)
+```
+fission: {
+  ffmpeg: '/usr/local/bin/ffmpeg',
+  tasks: [
+    {
+      rule: "game/*",
+      model: [
+        {
+          ab: "128k",
+          vb: "1500k",
+          vs: "1280x720",
+          vf: "30",
+        },
+        {
+          ab: "96k",
+          vb: "1000k",
+          vs: "854x480",
+          vf: "24",
+        },
+        {
+          ab: "96k",
+          vb: "600k",
+          vs: "640x360",
+          vf: "20",
+        },
+      ]
+    },
+    {
+      rule: "show/*",
+      model: [
+        {
+          ab: "128k",
+          vb: "1500k",
+          vs: "720x1280",
+          vf: "30",
+        },
+        {
+          ab: "96k",
+          vb: "1000k",
+          vs: "480x854",
+          vf: "24",
+        },
+        {
+          ab: "64k",
+          vb: "600k",
+          vs: "360x640",
+          vf: "20",
+        },
+      ]
+    },
+  ]
+}
+```
+
 # Publisher and Player App/SDK
 
 ## Android Livestream App
@@ -679,7 +736,7 @@ https://github.com/NodeMedia/NodeMediaClient-iOS
 https://github.com/NodeMedia/react-native-nodemediaclient
 
 ## NodePlayer.js HTML5 live player
-* Implemented with asm.js
+* Implemented with asm.js / wasm
 * http-flv/ws-flv
 * H.264/H.265 + AAC/Nellymoser/G.711 decoder
 * Ultra low latency (Support for iOS safari browser)
