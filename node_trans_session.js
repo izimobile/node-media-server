@@ -45,14 +45,14 @@ class NodeTransSession extends EventEmitter {
       let hlsFileName = 'index.m3u8';
       let mapHls = `${this.conf.hlsFlags}${ouPath}/${hlsFileName}|`;
       mapStr += mapHls;
-      Logger.log('[Transmuxing HLS] ' + this.conf.streamPath + ' to ' + ouPath + '/' + hlsFileName);
+      Logger.log('[Transmuxing HLSsssss] ' + this.conf.streamPath + ' to ' + ouPath + '/' + hlsFileName);
     }
     if (this.conf.dash) {
       this.conf.dashFlags = this.conf.dashFlags ? this.conf.dashFlags : '';
       let dashFileName = 'index.mpd';
       let mapDash = `${this.conf.dashFlags}${ouPath}/${dashFileName}`;
       mapStr += mapDash;
-      Logger.log('[Transmuxing DASH] ' + this.conf.streamPath + ' to ' + ouPath + '/' + dashFileName);
+      Logger.log('[Transmuxing DASHh] ' + this.conf.streamPath + ' to ' + ouPath + '/' + dashFileName);
     }
     mkdirp.sync(ouPath);
     let argv = ['-y', '-i', inPath];
@@ -62,6 +62,7 @@ class NodeTransSession extends EventEmitter {
     Array.prototype.push.apply(argv, this.conf.acParam);
     Array.prototype.push.apply(argv, ['-f', 'tee', '-map', '0:a?', '-map', '0:v?', mapStr]);
     argv = argv.filter((n) => { return n }); //去空
+    Logger.log('ffmpeg args ',JSON.stringify(argv))
     this.ffmpeg_exec = spawn(this.conf.ffmpeg, argv);
     this.ffmpeg_exec.on('error', (e) => {
       Logger.ffdebug(e);
@@ -69,10 +70,12 @@ class NodeTransSession extends EventEmitter {
 
     this.ffmpeg_exec.stdout.on('data', (data) => {
       Logger.ffdebug(`FF输出：${data}`);
+      Logger.log('ffmpeg stdout....', data)
     });
 
     this.ffmpeg_exec.stderr.on('data', (data) => {
       Logger.ffdebug(`FF输出：${data}`);
+      Logger.log('ffmpeg stderr....', data)
     });
 
     this.ffmpeg_exec.on('close', (code) => {
