@@ -4,7 +4,7 @@
 //  Copyright (c) 2018 Nodemedia. All rights reserved.
 //
 const Logger = require('./node_core_logger');
-
+const context = require("./node_core_ctx");
 const EventEmitter = require('events');
 const { spawn } = require('child_process');
 const dateFormat = require('dateformat');
@@ -18,6 +18,7 @@ class NodeTransSession extends EventEmitter {
   }
 
   run() {
+    Logger.log('NTS! ',JSON.stringify(this.conf))
     let vc = this.conf.vc || 'copy';
     let ac = this.conf.ac || 'copy';
     let inPath = 'rtmp://127.0.0.1:' + this.conf.rtmpPort + this.conf.streamPath;
@@ -45,14 +46,14 @@ class NodeTransSession extends EventEmitter {
       let hlsFileName = 'index.m3u8';
       let mapHls = `${this.conf.hlsFlags}${ouPath}/${hlsFileName}|`;
       mapStr += mapHls;
-      Logger.log('[Transmuxing HLSsssss] ' + this.conf.streamPath + ' to ' + ouPath + '/' + hlsFileName);
+      Logger.log('[Transmuxing HLS] ' + this.conf.streamPath + ' to ' + ouPath + '/' + hlsFileName);
     }
     if (this.conf.dash) {
       this.conf.dashFlags = this.conf.dashFlags ? this.conf.dashFlags : '';
       let dashFileName = 'index.mpd';
       let mapDash = `${this.conf.dashFlags}${ouPath}/${dashFileName}`;
       mapStr += mapDash;
-      Logger.log('[Transmuxing DASHh] ' + this.conf.streamPath + ' to ' + ouPath + '/' + dashFileName);
+      Logger.log('[Transmuxing DASH] ' + this.conf.streamPath + ' to ' + ouPath + '/' + dashFileName);
     }
     mkdirp.sync(ouPath);
     let argv = ['-y', '-i', inPath];
@@ -62,12 +63,10 @@ class NodeTransSession extends EventEmitter {
     Array.prototype.push.apply(argv, this.conf.acParam);
     Array.prototype.push.apply(argv, ['-f', 'tee', '-map', '0:a?', '-map', '0:v?', mapStr]);
     argv = argv.filter((n) => { return n }); //去空
-    //grabbing ffmpeg commands from rtmp config raw
-    argv = ['-y', 
-      '-i', inPath,
-      ...this.conf.raw
-      ];
-    Logger.log('ffmpeg args ',JSON.stringify(argv))
+
+    //CUSTOM use conf.raw for ffmpeg command for now KB 8/12/20 .. prob until need appname in here
+    argv = ['-y', '-i', inPath, ...this.conf.raw.map(c => c.replace('${ouPath}', ouPath))];
+
     this.ffmpeg_exec = spawn(this.conf.ffmpeg, argv);
     this.ffmpeg_exec.on('error', (e) => {
       Logger.ffdebug(e);
@@ -75,12 +74,10 @@ class NodeTransSession extends EventEmitter {
 
     this.ffmpeg_exec.stdout.on('data', (data) => {
       Logger.ffdebug(`FF输出：${data}`);
-      Logger.log('ffmpeg stdout....', data)
     });
 
     this.ffmpeg_exec.stderr.on('data', (data) => {
       Logger.ffdebug(`FF输出：${data}`);
-      Logger.log('ffmpeg stderr....', data)
     });
 
     this.ffmpeg_exec.on('close', (code) => {
@@ -94,6 +91,7 @@ class NodeTransSession extends EventEmitter {
               || filename.endsWith('.mpd')
               || filename.endsWith('.m4s')
               || filename.endsWith('.tmp')) {
+                //CUSTOM we dont want to do this here, will take care of in nms in svr-api
               //fs.unlinkSync(ouPath + '/' + filename);
             }
           })
