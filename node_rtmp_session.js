@@ -1024,7 +1024,7 @@ class NodeRtmpSession {
 
     redis.get(this.publishStreamPath).then((doc, err) => {
       if(err) {
-        console.log('ERROR in onPublish redis.get(this.publishStreamPath)',err)
+        Logger.log('ERROR in onPublish redis.get(this.publishStreamPath)',err)
       } else {
         if (doc) {
           Logger.log(`[rtmp publish] Already has a stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId} v=${redis.get(this.publishStreamPath)}`);
@@ -1041,6 +1041,7 @@ class NodeRtmpSession {
             for (let idlePlayerId of context.idlePlayers) {
               let idlePlayer = context.sessions.get(idlePlayerId);
               if (idlePlayer.playStreamPath === this.publishStreamPath) {
+                Logger.log(`onPublish idlePlayer.onStartPlay called for stream ${this.publishStreamId}`)
                 idlePlayer.onStartPlay();
                 context.idlePlayers.delete(idlePlayerId);
               }
@@ -1102,72 +1103,90 @@ class NodeRtmpSession {
       this.respondPlay();
     }
 
-    if (redis.get(this.playStreamPath)) {
+    redis.get(this.playStreamPath).then((doc, err) => {
+      if (err) {
+        Logger.log('ERROR in onPlay redis.get(this.publishStreamPath)',err)
+      } else if (doc) {
+        Logger.log(`[rtmp play] onPlay this.onStartPlay called. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
+        this.onStartPlay();
+      } else {
+        Logger.log(`[rtmp play] Stream not found. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
+        this.isIdling = true;
+        context.idlePlayers.add(this.id);
+      }
+    });
+    /*if (redis.get(this.playStreamPath)) {
       this.onStartPlay();
     } else {
       Logger.log(`[rtmp play] Stream not found. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
       this.isIdling = true;
       context.idlePlayers.add(this.id);
-    }
+    }*/
   }
 
   onStartPlay() {
     redis.get(this.playStreamPath).then ((publisherId, err) => {
       if (err) {
-        console.log('ERROR in onStartPlay() redis.get(this.playStreamPath)',err)
+        Logger.log('ERROR in onStartPlay() redis.get(this.playStreamPath)',err)
       } else {
-        //let publisherId = redis.get(this.playStreamPath);
-        let publisher = context.sessions.get(publisherId);
-        let players = publisher.players;
-        players.add(this.id);
+        if (publisherId) {
+          Logger.log(`onStartPlay found publisherId for stream ${this.playStreamPath}`,publisherId);
+          //let publisherId = redis.get(this.playStreamPath);
+          let publisher = context.sessions.get(publisherId);
+          let players = publisher.players;
+          players.add(this.id);
 
-        if (publisher.metaData != null) {
-          let packet = RtmpPacket.create();
-          packet.header.fmt = RTMP_CHUNK_TYPE_0;
-          packet.header.cid = RTMP_CHANNEL_DATA;
-          packet.header.type = RTMP_TYPE_DATA;
-          packet.payload = publisher.metaData;
-          packet.header.length = packet.payload.length;
-          packet.header.stream_id = this.playStreamId;
-          let chunks = this.rtmpChunksCreate(packet);
-          this.socket.write(chunks);
-        }
-
-        if (publisher.audioCodec === 10) {
-          let packet = RtmpPacket.create();
-          packet.header.fmt = RTMP_CHUNK_TYPE_0;
-          packet.header.cid = RTMP_CHANNEL_AUDIO;
-          packet.header.type = RTMP_TYPE_AUDIO;
-          packet.payload = publisher.aacSequenceHeader;
-          packet.header.length = packet.payload.length;
-          packet.header.stream_id = this.playStreamId;
-          let chunks = this.rtmpChunksCreate(packet);
-          this.socket.write(chunks);
-        }
-
-        if (publisher.videoCodec === 7 || publisher.videoCodec === 12) {
-          let packet = RtmpPacket.create();
-          packet.header.fmt = RTMP_CHUNK_TYPE_0;
-          packet.header.cid = RTMP_CHANNEL_VIDEO;
-          packet.header.type = RTMP_TYPE_VIDEO;
-          packet.payload = publisher.avcSequenceHeader;
-          packet.header.length = packet.payload.length;
-          packet.header.stream_id = this.playStreamId;
-          let chunks = this.rtmpChunksCreate(packet);
-          this.socket.write(chunks);
-        }
-
-        if (publisher.rtmpGopCacheQueue != null) {
-          for (let chunks of publisher.rtmpGopCacheQueue) {
-            chunks.writeUInt32LE(this.playStreamId, 8);
+          if (publisher.metaData != null) {
+            let packet = RtmpPacket.create();
+            packet.header.fmt = RTMP_CHUNK_TYPE_0;
+            packet.header.cid = RTMP_CHANNEL_DATA;
+            packet.header.type = RTMP_TYPE_DATA;
+            packet.payload = publisher.metaData;
+            packet.header.length = packet.payload.length;
+            packet.header.stream_id = this.playStreamId;
+            let chunks = this.rtmpChunksCreate(packet);
             this.socket.write(chunks);
           }
-        }
 
-        this.isIdling = false;
-        this.isPlaying = true;
-        context.nodeEvent.emit("postPlay", this.id, this.playStreamPath, this.playArgs);
-        Logger.log(`[rtmp play] Join stream. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId} `);
+          if (publisher.audioCodec === 10) {
+            let packet = RtmpPacket.create();
+            packet.header.fmt = RTMP_CHUNK_TYPE_0;
+            packet.header.cid = RTMP_CHANNEL_AUDIO;
+            packet.header.type = RTMP_TYPE_AUDIO;
+            packet.payload = publisher.aacSequenceHeader;
+            packet.header.length = packet.payload.length;
+            packet.header.stream_id = this.playStreamId;
+            let chunks = this.rtmpChunksCreate(packet);
+            this.socket.write(chunks);
+          }
+
+          if (publisher.videoCodec === 7 || publisher.videoCodec === 12) {
+            let packet = RtmpPacket.create();
+            packet.header.fmt = RTMP_CHUNK_TYPE_0;
+            packet.header.cid = RTMP_CHANNEL_VIDEO;
+            packet.header.type = RTMP_TYPE_VIDEO;
+            packet.payload = publisher.avcSequenceHeader;
+            packet.header.length = packet.payload.length;
+            packet.header.stream_id = this.playStreamId;
+            let chunks = this.rtmpChunksCreate(packet);
+            this.socket.write(chunks);
+          }
+
+          if (publisher.rtmpGopCacheQueue != null) {
+            for (let chunks of publisher.rtmpGopCacheQueue) {
+              chunks.writeUInt32LE(this.playStreamId, 8);
+              this.socket.write(chunks);
+            }
+          }
+
+          this.isIdling = false;
+          this.isPlaying = true;
+          context.nodeEvent.emit("postPlay", this.id, this.playStreamPath, this.playArgs);
+          Logger.log(`[rtmp play] Join stream. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId} `);
+        }
+        else {
+          Logger.log('onStartPlay did NOT find a publisherId for stream ',this.playStreamPath);
+        }
       }
     });
 
