@@ -174,7 +174,7 @@ class NodeRtmpSession {
     this.players = new Set();
     this.numPlayCache = 0;
     //context.sessions.set(this.id, this);
-    redis.set(this.id, this);
+    redis.set(this.id, JSON.stringify(this));
   }
 
   run() {
@@ -652,10 +652,12 @@ class NodeRtmpSession {
     }
 
     for (let playerId of this.players) {
-      redis.get(playerId).then((playerSession, err) => {
+      redis.get(playerId).then((playerSessionStr, err) => {
         if(err) {
           Logger.log('ERROR in rtmpaudiohandler redis.get(playerId)',err)
-        } else if (playerSession) {
+        } else if (playerSessionStr) {
+          let playerSession = JSON.parse(playerSessionStr);
+          Logger.log(`rtmpAudioHandler playerId ${playerId} found `,playerSession)
             //let playerSession = context.sessions.get(playerId);
 
             if (playerSession.numPlayCache === 0) {
@@ -744,12 +746,13 @@ class NodeRtmpSession {
 
     // Logger.log(rtmpChunks);
     for (let playerId of this.players) {
-      redis.get(playerId).then((playerSession, err) => {
+      redis.get(playerId).then((playerSessionStr, err) => {
         if(err) {
           Logger.log('ERROR in rtmpvideohandler redis.get(playerId)',err)
-        } else if (playerSession) {
+        } else if (playerSessionStr) {
+          let playerSession = JSON.parse(playerSessionStr)
           //let playerSession = context.sessions.get(playerId);
-
+          Logger.log(`rtmpVideoHandler playerId ${playerId} found `,playerSession)
           if (playerSession.numPlayCache === 0) {
             playerSession.res.cork();
           }
@@ -808,11 +811,13 @@ class NodeRtmpSession {
         let flvTag = NodeFlvSession.createFlvTag(packet);
 
         for (let playerId of this.players) {
-          redis.get(playerId).then((playerSession, err) => {
+          redis.get(playerId).then((playerSessionStr, err) => {
             if(err) {
               Logger.log('ERROR in rtmpdatahandler redis.get(playerId)',err)
-            } else if (playerSession) {
+            } else if (playerSessionStr) {
+              let playerSession = JSON.parse(playerSessionStr)
               //let playerSession = context.sessions.get(playerId);
+              Logger.log(`rtmpDataHandler playerId ${playerId} found `,playerSession)
               if (playerSession instanceof NodeRtmpSession) {
                 if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause) {
                   rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
@@ -1066,11 +1071,12 @@ class NodeRtmpSession {
 
             this.sendStatusMessage(this.publishStreamId, "status", "NetStream.Publish.Start", `${this.publishStreamPath} is now published.`);
             for (let idlePlayerId of context.idlePlayers) {
-              redis.get(idlePlayerId).then((idlePlayer, err) => {
+              redis.get(idlePlayerId).then((idlePlayerStr, err) => {
                 if(err) {
-                  Logger.log('ERROR in rtmpdatahandler redis.get(idlePlayerId)',err)
-                } else if (idlePlayer) {
-
+                  Logger.log('ERROR in onpublish redis.get(idlePlayerId)',err)
+                } else if (idlePlayerStr) {
+                  let idlePlayer = JSON.parse(idlePlayerStr)
+                    Logger.log(`onpublish idlePlayerId ${idlePlayerId} found `,idlePlayer)
                   //let idlePlayer = context.sessions.get(idlePlayerId);
                   if (idlePlayer.playStreamPath === this.publishStreamPath) {
                     Logger.log(`onPublish idlePlayer.onStartPlay called for stream ${this.publishStreamId}`)
@@ -1167,11 +1173,13 @@ class NodeRtmpSession {
         if (publisherId) {
           Logger.log(`onStartPlay found publisherId for stream ${this.playStreamPath}`,publisherId);
           //let publisherId = redis.get(this.playStreamPath);
-          redis.get(publisherId).then((publisher, err) => {
+          redis.get(publisherId).then((publisherStr, err) => {
             if (err) {
               Logger.log('ERROR in onStartPlay() redis.get(publisherId)',err)
-            } else if (publisher) {
+            } else if (publisherStr) {
+              let publisher = JSON.parse(publisherStr)
               //let publisher = context.sessions.get(publisherId);
+              Logger.log(`onStartPlay publisher found ${publisherId}`,publisher)
               let players = publisher.players;
               players.add(this.id);
 
@@ -1307,11 +1315,13 @@ class NodeRtmpSession {
 
           } else {
             //let publisherId = redis.get(this.playStreamPath);
+            Logger.log(`onDeleteStreeam found `,publisherId)
             if (publisherId != null) {
-              redis.get(publisherId).then((publisher, err) => {
+              redis.get(publisherId).then((publisherStr, err) => {
                 if (err) {
                   Logger.log('ERROR in onStartPlay() redis.get(publisherId)',err)
-                } else if (publisher) {
+                } else if (publisherStr) {
+                  let publisher = JSON.parse(publisherStr)
                   //context.sessions.get(publisherId).players.delete(this.id);
                   publisher.players.delete(this.id);
                 } else {
@@ -1342,11 +1352,13 @@ class NodeRtmpSession {
         }
 
         for (let playerId of this.players) {
-          redis.get(playerId).then((playerSession, err) => {
+          redis.get(playerId).then((playerSessionStr, err) => {
             if(err) {
               Logger.log('ERROR in onDeleteStream redis.get(playerId)',err)
-            } else if (playerSession) {
+            } else if (playerSessionStr) {
+              let playerSession = JSON.parse(playerSessionStr)
               //let playerSession = context.sessions.get(playerId);
+              Logger.log(`ondeletestream playerId ${playerId} found `,playerSession)
               if (playerSession instanceof NodeRtmpSession) {
                 playerSession.sendStatusMessage(playerSession.playStreamId, "status", "NetStream.Play.UnpublishNotify", "stream is now unpublished.");
                 playerSession.flush();
@@ -1361,11 +1373,13 @@ class NodeRtmpSession {
 
         //let the players to idlePlayers
         for (let playerId of this.players) {
-          redis.get(playerId).then((playerSession, err) => {
+          redis.get(playerId).then((playerSessionStr, err) => {
             if(err) {
               Logger.log('ERROR in onDeleteStream redis.get(playerId)2 ',err)
-            } else if (playerSession) {
+            } else if (playerSessionStr) {
+              let playerSession = JSON.parse(playerSessionStr)
               //let playerSession = context.sessions.get(playerId);
+              Logger.log(`ondeletestream2 playerId ${playerId} found `,playerSession)
               context.idlePlayers.add(playerId);
               playerSession.isPlaying = false;
               playerSession.isIdling = true;
