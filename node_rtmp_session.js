@@ -3,7 +3,6 @@
 //  illuspas[a]gmail.com
 //  Copyright (c) 2018 Nodemedia. All rights reserved.
 //
-const { redis } = require('@evdy/svr-env');
 
 const QueryString = require("querystring");
 const AV = require("./node_core_av");
@@ -174,7 +173,6 @@ class NodeRtmpSession {
     this.players = new Set();
     this.numPlayCache = 0;
     context.sessions.set(this.id, this);
-    //redis.set(this.id, JSON.stringify(this));
   }
 
   run() {
@@ -208,7 +206,6 @@ class NodeRtmpSession {
 
       context.sessions.delete(this.id);
       this.socket.destroy();
-      //redis.del(this.id);
     }
   }
 
@@ -652,40 +649,29 @@ class NodeRtmpSession {
     }
 
     for (let playerId of this.players) {
-      //redis.get(playerId).then((playerSessionStr, err) => {
-        //if(err) {
-          //Logger.log('ERROR in rtmpaudiohandler redis.get(playerId)',err)
-        //} else if (playerSessionStr) {
-          //let playerSession = JSON.parse(playerSessionStr);
+      let playerSession = context.sessions.get(playerId);
 
-            let playerSession = context.sessions.get(playerId);
-  Logger.log(`rtmpAudioHandler playerId ${playerId} found `,playerSession)
-            if (playerSession.numPlayCache === 0) {
-              playerSession.res.cork();
-            }
+      if (playerSession.numPlayCache === 0) {
+        playerSession.res.cork();
+      }
 
-            if (playerSession instanceof NodeRtmpSession) {
-              if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause && playerSession.isReceiveAudio) {
-                rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
-                playerSession.res.write(rtmpChunks);
-              }
-            } else if (playerSession instanceof NodeFlvSession) {
-              playerSession.res.write(flvTag, null, e => {
-                //websocket will throw a error if not set the cb when closed
-              });
-            }
+      if (playerSession instanceof NodeRtmpSession) {
+        if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause && playerSession.isReceiveAudio) {
+          rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
+          playerSession.res.write(rtmpChunks);
+        }
+      } else if (playerSession instanceof NodeFlvSession) {
+        playerSession.res.write(flvTag, null, e => {
+          //websocket will throw a error if not set the cb when closed
+        });
+      }
 
-            playerSession.numPlayCache++;
+      playerSession.numPlayCache++;
 
-            if (playerSession.numPlayCache === 10) {
-              process.nextTick(() => playerSession.res.uncork());
-              playerSession.numPlayCache = 0;
-            }
-        //} else {
-          //Logger.log('rtmpaudiohandler did NOT find redis.get(playerId)',playerId)
-        //}
-      //})
-
+      if (playerSession.numPlayCache === 10) {
+        process.nextTick(() => playerSession.res.uncork());
+        playerSession.numPlayCache = 0;
+      }
     }
   }
 
@@ -746,38 +732,29 @@ class NodeRtmpSession {
 
     // Logger.log(rtmpChunks);
     for (let playerId of this.players) {
-      //redis.get(playerId).then((playerSessionStr, err) => {
-      //  if(err) {
-        //  Logger.log('ERROR in rtmpvideohandler redis.get(playerId)',err)
-        //} else if (playerSessionStr) {
-          //let playerSession = JSON.parse(playerSessionStr)
-          let playerSession = context.sessions.get(playerId);
-          Logger.log(`rtmpVideoHandler playerId ${playerId} found `,playerSession)
-          if (playerSession.numPlayCache === 0) {
-            playerSession.res.cork();
-          }
+      let playerSession = context.sessions.get(playerId);
 
-          if (playerSession instanceof NodeRtmpSession) {
-            if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause && playerSession.isReceiveVideo) {
-              rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
-              playerSession.res.write(rtmpChunks);
-            }
-          } else if (playerSession instanceof NodeFlvSession) {
-            playerSession.res.write(flvTag, null, e => {
-              //websocket will throw a error if not set the cb when closed
-            });
-          }
+      if (playerSession.numPlayCache === 0) {
+        playerSession.res.cork();
+      }
 
-          playerSession.numPlayCache++;
+      if (playerSession instanceof NodeRtmpSession) {
+        if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause && playerSession.isReceiveVideo) {
+          rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
+          playerSession.res.write(rtmpChunks);
+        }
+      } else if (playerSession instanceof NodeFlvSession) {
+        playerSession.res.write(flvTag, null, e => {
+          //websocket will throw a error if not set the cb when closed
+        });
+      }
 
-          if (playerSession.numPlayCache === 10) {
-            process.nextTick(() => playerSession.res.uncork());
-            playerSession.numPlayCache = 0;
-          }
-      //  } else {
-      //    Logger.log('rtmpvideohandler did NOT find redis.get(playerId)',playerId)
-      //  }
-      //});
+      playerSession.numPlayCache++;
+
+      if (playerSession.numPlayCache === 10) {
+        process.nextTick(() => playerSession.res.uncork());
+        playerSession.numPlayCache = 0;
+      }
     }
   }
 
@@ -811,27 +788,17 @@ class NodeRtmpSession {
         let flvTag = NodeFlvSession.createFlvTag(packet);
 
         for (let playerId of this.players) {
-          //redis.get(playerId).then((playerSessionStr, err) => {
-            //if(err) {
-            //  Logger.log('ERROR in rtmpdatahandler redis.get(playerId)',err)
-            //} else if (playerSessionStr) {
-              //let playerSession = JSON.parse(playerSessionStr)
-              let playerSession = context.sessions.get(playerId);
-              Logger.log(`rtmpDataHandler playerId ${playerId} found `,playerSession)
-              if (playerSession instanceof NodeRtmpSession) {
-                if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause) {
-                  rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
-                  playerSession.socket.write(rtmpChunks);
-                }
-              } else if (playerSession instanceof NodeFlvSession) {
-                playerSession.res.write(flvTag, null, e => {
-                  //websocket will throw a error if not set the cb when closed
-                });
-              }
-            //} else {
-            //  Logger.log('rtmpdatahandler did NOT find redis.get(playerId)',playerId)
-            //}
-          //});
+          let playerSession = context.sessions.get(playerId);
+          if (playerSession instanceof NodeRtmpSession) {
+            if (playerSession.isStarting && playerSession.isPlaying && !playerSession.isPause) {
+              rtmpChunks.writeUInt32LE(playerSession.playStreamId, 8);
+              playerSession.socket.write(rtmpChunks);
+            }
+          } else if (playerSession instanceof NodeFlvSession) {
+            playerSession.res.write(flvTag, null, e => {
+              //websocket will throw a error if not set the cb when closed
+            });
+          }
         }
         break;
     }
@@ -1054,53 +1021,15 @@ class NodeRtmpSession {
       }
     }
 
-    redis.get(this.publishStreamPath).then((doc, err) => {
-      if(err) {
-        Logger.log('ERROR in onPublish redis.get(this.publishStreamPath)',err)
-      } else {
-        if (doc) {
-          Logger.log(`[rtmp publish] Already has a stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId} v=${redis.get(this.publishStreamPath)}`);
-          this.sendStatusMessage(this.publishStreamId, "error", "NetStream.Publish.BadName", "Stream already publishing");
-        } else if (this.isPublishing) {
-          Logger.log(`[rtmp publish] NetConnection is publishing. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId}`);
-          this.sendStatusMessage(this.publishStreamId, "error", "NetStream.Publish.BadConnection", "Connection already publishing");
-        } else {
-          Logger.log(`[rtmp publish] New stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId}`);
-          redis.set(this.publishStreamPath, this.id).then(() => {
-            this.isPublishing = true;
-
-            this.sendStatusMessage(this.publishStreamId, "status", "NetStream.Publish.Start", `${this.publishStreamPath} is now published.`);
-            for (let idlePlayerId of context.idlePlayers) {
-              //redis.get(idlePlayerId).then((idlePlayerStr, err) => {
-                //if(err) {
-                  //Logger.log('ERROR in onpublish redis.get(idlePlayerId)',err)
-                //} else if (idlePlayerStr) {
-                  //let idlePlayer = JSON.parse(idlePlayerStr)
-                    //Logger.log(`onpublish idlePlayerId ${idlePlayerId} found `,idlePlayer)
-                  let idlePlayer = context.sessions.get(idlePlayerId);
-                  if (idlePlayer.playStreamPath === this.publishStreamPath) {
-                    Logger.log(`onPublish idlePlayer.onStartPlay called for stream ${this.publishStreamId}`)
-                    idlePlayer.onStartPlay();
-                    //wondering if this is supposed to be a redis del?
-                    context.idlePlayers.delete(idlePlayerId);
-                  }
-                //}
-              //});
-            }
-            context.nodeEvent.emit("postPublish", this.id, this.publishStreamPath, this.publishArgs);
-          });
-        }
-      }
-    });
-    /*if (redis.get(this.publishStreamPath)) {
-      Logger.log(`[rtmp publish] Already has a stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId} v=${redis.get(this.publishStreamPath)}`);
+    if (context.publishers.has(this.publishStreamPath)) {
+      Logger.log(`[rtmp publish] Already has a stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId}`);
       this.sendStatusMessage(this.publishStreamId, "error", "NetStream.Publish.BadName", "Stream already publishing");
     } else if (this.isPublishing) {
       Logger.log(`[rtmp publish] NetConnection is publishing. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId}`);
       this.sendStatusMessage(this.publishStreamId, "error", "NetStream.Publish.BadConnection", "Connection already publishing");
     } else {
       Logger.log(`[rtmp publish] New stream. id=${this.id} streamPath=${this.publishStreamPath} streamId=${this.publishStreamId}`);
-      redis.set(this.publishStreamPath, this.id);
+      context.publishers.set(this.publishStreamPath, this.id);
       this.isPublishing = true;
 
       this.sendStatusMessage(this.publishStreamId, "status", "NetStream.Publish.Start", `${this.publishStreamPath} is now published.`);
@@ -1112,7 +1041,7 @@ class NodeRtmpSession {
         }
       }
       context.nodeEvent.emit("postPublish", this.id, this.publishStreamPath, this.publishArgs);
-    }*/
+    }
   }
 
   onPlay(invokeMessage) {
@@ -1144,107 +1073,70 @@ class NodeRtmpSession {
       this.respondPlay();
     }
 
-    redis.get(this.playStreamPath).then((doc, err) => {
-      if (err) {
-        Logger.log('ERROR in onPlay redis.get(this.publishStreamPath)',err)
-      } else if (doc) {
-        Logger.log(`[rtmp play] onPlay this.onStartPlay called. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
-        this.onStartPlay();
-      } else {
-        Logger.log(`[rtmp play] Stream not found. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
-        this.isIdling = true;
-        context.idlePlayers.add(this.id);
-      }
-    });
-    /*if (redis.get(this.playStreamPath)) {
+    if (context.publishers.has(this.playStreamPath)) {
       this.onStartPlay();
     } else {
       Logger.log(`[rtmp play] Stream not found. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId}`);
       this.isIdling = true;
       context.idlePlayers.add(this.id);
-    }*/
+    }
   }
 
   onStartPlay() {
-    redis.get(this.playStreamPath).then ((publisherId, err) => {
-      if (err) {
-        Logger.log('ERROR in onStartPlay() redis.get(this.playStreamPath)',err)
-      } else {
-        if (publisherId) {
-          Logger.log(`onStartPlay found publisherId for stream ${this.playStreamPath}`,publisherId);
-          //let publisherId = redis.get(this.playStreamPath);
-          //redis.get(publisherId).then((publisherStr, err) => {
-            //if (err) {
-            //  Logger.log('ERROR in onStartPlay() redis.get(publisherId)',err)
-            //} else if (publisherStr) {
-              //let publisher = JSON.parse(publisherStr)
-              let publisher = context.sessions.get(publisherId);
-              Logger.log(`onStartPlay publisher found ${publisherId}`,publisher)
-              let players = publisher.players;
-              players.add(this.id);
+    let publisherId = context.publishers.get(this.playStreamPath);
+    let publisher = context.sessions.get(publisherId);
+    let players = publisher.players;
+    players.add(this.id);
 
-              if (publisher.metaData != null) {
-                let packet = RtmpPacket.create();
-                packet.header.fmt = RTMP_CHUNK_TYPE_0;
-                packet.header.cid = RTMP_CHANNEL_DATA;
-                packet.header.type = RTMP_TYPE_DATA;
-                packet.payload = publisher.metaData;
-                packet.header.length = packet.payload.length;
-                packet.header.stream_id = this.playStreamId;
-                let chunks = this.rtmpChunksCreate(packet);
-                this.socket.write(chunks);
-              }
+    if (publisher.metaData != null) {
+      let packet = RtmpPacket.create();
+      packet.header.fmt = RTMP_CHUNK_TYPE_0;
+      packet.header.cid = RTMP_CHANNEL_DATA;
+      packet.header.type = RTMP_TYPE_DATA;
+      packet.payload = publisher.metaData;
+      packet.header.length = packet.payload.length;
+      packet.header.stream_id = this.playStreamId;
+      let chunks = this.rtmpChunksCreate(packet);
+      this.socket.write(chunks);
+    }
 
-              if (publisher.audioCodec === 10) {
-                let packet = RtmpPacket.create();
-                packet.header.fmt = RTMP_CHUNK_TYPE_0;
-                packet.header.cid = RTMP_CHANNEL_AUDIO;
-                packet.header.type = RTMP_TYPE_AUDIO;
-                packet.payload = publisher.aacSequenceHeader;
-                packet.header.length = packet.payload.length;
-                packet.header.stream_id = this.playStreamId;
-                let chunks = this.rtmpChunksCreate(packet);
-                this.socket.write(chunks);
-              }
+    if (publisher.audioCodec === 10) {
+      let packet = RtmpPacket.create();
+      packet.header.fmt = RTMP_CHUNK_TYPE_0;
+      packet.header.cid = RTMP_CHANNEL_AUDIO;
+      packet.header.type = RTMP_TYPE_AUDIO;
+      packet.payload = publisher.aacSequenceHeader;
+      packet.header.length = packet.payload.length;
+      packet.header.stream_id = this.playStreamId;
+      let chunks = this.rtmpChunksCreate(packet);
+      this.socket.write(chunks);
+    }
 
-              if (publisher.videoCodec === 7 || publisher.videoCodec === 12) {
-                let packet = RtmpPacket.create();
-                packet.header.fmt = RTMP_CHUNK_TYPE_0;
-                packet.header.cid = RTMP_CHANNEL_VIDEO;
-                packet.header.type = RTMP_TYPE_VIDEO;
-                packet.payload = publisher.avcSequenceHeader;
-                packet.header.length = packet.payload.length;
-                packet.header.stream_id = this.playStreamId;
-                let chunks = this.rtmpChunksCreate(packet);
-                this.socket.write(chunks);
-              }
+    if (publisher.videoCodec === 7 || publisher.videoCodec === 12) {
+      let packet = RtmpPacket.create();
+      packet.header.fmt = RTMP_CHUNK_TYPE_0;
+      packet.header.cid = RTMP_CHANNEL_VIDEO;
+      packet.header.type = RTMP_TYPE_VIDEO;
+      packet.payload = publisher.avcSequenceHeader;
+      packet.header.length = packet.payload.length;
+      packet.header.stream_id = this.playStreamId;
+      let chunks = this.rtmpChunksCreate(packet);
+      this.socket.write(chunks);
+    }
 
-              if (publisher.rtmpGopCacheQueue != null) {
-                for (let chunks of publisher.rtmpGopCacheQueue) {
-                  chunks.writeUInt32LE(this.playStreamId, 8);
-                  this.socket.write(chunks);
-                }
-              }
-
-              this.isIdling = false;
-              this.isPlaying = true;
-              context.nodeEvent.emit("postPlay", this.id, this.playStreamPath, this.playArgs);
-              Logger.log(`[rtmp play] Join stream. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId} `);
-            //} else {
-              //Logger.log('onStartPlay did NOT find publisherId', publisherId);
-            //}
-          //})
-
-        }
-        else {
-          Logger.log('onStartPlay did NOT find a publisherId for stream ',this.playStreamPath);
-        }
+    if (publisher.rtmpGopCacheQueue != null) {
+      for (let chunks of publisher.rtmpGopCacheQueue) {
+        chunks.writeUInt32LE(this.playStreamId, 8);
+        this.socket.write(chunks);
       }
-    });
+    }
 
+    this.isIdling = false;
+    this.isPlaying = true;
+    context.nodeEvent.emit("postPlay", this.id, this.playStreamPath, this.playArgs);
+    Logger.log(`[rtmp play] Join stream. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId} `);
   }
 
-  //dont think this is being used
   onPause(invokeMessage) {
     this.isPause = invokeMessage.pause;
     let c = this.isPause ? "NetStream.Pause.Notify" : "NetStream.Unpause.Notify";
@@ -1252,9 +1144,9 @@ class NodeRtmpSession {
     Logger.log(`[rtmp play] ${d} stream. id=${this.id} streamPath=${this.playStreamPath}  streamId=${this.playStreamId} `);
     if (!this.isPause) {
       this.sendStreamStatus(STREAM_BEGIN, this.playStreamId);
-      if (redis.get(this.playStreamPath)) {
+      if (context.publishers.has(this.playStreamPath)) {
         //fix ckplayer
-        let publisherId = redis.get(this.playStreamPath);
+        let publisherId = context.publishers.get(this.playStreamPath);
         let publisher = context.sessions.get(publisherId);
         let players = publisher.players;
         if (publisher.audioCodec === 10) {
@@ -1310,30 +1202,12 @@ class NodeRtmpSession {
         context.idlePlayers.delete(this.id);
         this.isIdling = false;
       } else {
-        redis.get(this.playStreamPath).then((publisherId, err) => {
-          if(err) {
-
-          } else {
-            //let publisherId = redis.get(this.playStreamPath);
-            Logger.log(`onDeleteStreeam found `,publisherId)
-            if (publisherId != null) {
-              //redis.get(publisherId).then((publisherStr, err) => {
-                //if (err) {
-                  //Logger.log('ERROR in onStartPlay() redis.get(publisherId)',err)
-                //} else if (publisherStr) {
-                  //let publisher = JSON.parse(publisherStr)
-                  context.sessions.get(publisherId).players.delete(this.id);
-                  //publisher.players.delete(this.id);
-                //} else {
-                  //Logger.log('onDeleteStream did NOT find redis.get(publisherId)', publisherId)
-                //}
-              //});
-
-            }
-            context.nodeEvent.emit("donePlay", this.id, this.playStreamPath, this.playArgs);
-            this.isPlaying = false;
-          }
-        });
+        let publisherId = context.publishers.get(this.playStreamPath);
+        if (publisherId != null) {
+          context.sessions.get(publisherId).players.delete(this.id);
+        }
+        context.nodeEvent.emit("donePlay", this.id, this.playStreamPath, this.playArgs);
+        this.isPlaying = false;
       }
       Logger.log(`[rtmp play] Close stream. id=${this.id} streamPath=${this.playStreamPath} streamId=${this.playStreamId}`);
       if (this.isStarting) {
@@ -1352,47 +1226,27 @@ class NodeRtmpSession {
         }
 
         for (let playerId of this.players) {
-          //redis.get(playerId).then((playerSessionStr, err) => {
-            //if(err) {
-              //Logger.log('ERROR in onDeleteStream redis.get(playerId)',err)
-            //} else if (playerSessionStr) {
-              //let playerSession = JSON.parse(playerSessionStr)
-              let playerSession = context.sessions.get(playerId);
-              Logger.log(`ondeletestream playerId ${playerId} found `,playerSession)
-              if (playerSession instanceof NodeRtmpSession) {
-                playerSession.sendStatusMessage(playerSession.playStreamId, "status", "NetStream.Play.UnpublishNotify", "stream is now unpublished.");
-                playerSession.flush();
-              } else {
-                playerSession.stop();
-              }
-            //} else {
-            //  Logger.log('onDeleteStream did NOT find redis.get(playerId)', playerId)
-            //}
-          //});
+          let playerSession = context.sessions.get(playerId);
+          if (playerSession instanceof NodeRtmpSession) {
+            playerSession.sendStatusMessage(playerSession.playStreamId, "status", "NetStream.Play.UnpublishNotify", "stream is now unpublished.");
+            playerSession.flush();
+          } else {
+            playerSession.stop();
+          }
         }
 
         //let the players to idlePlayers
         for (let playerId of this.players) {
-          //redis.get(playerId).then((playerSessionStr, err) => {
-            //if(err) {
-            //  Logger.log('ERROR in onDeleteStream redis.get(playerId)2 ',err)
-            //} else if (playerSessionStr) {
-            //  let playerSession = JSON.parse(playerSessionStr)
-              let playerSession = context.sessions.get(playerId);
-              Logger.log(`ondeletestream2 playerId ${playerId} found `,playerSession)
-              context.idlePlayers.add(playerId);
-              playerSession.isPlaying = false;
-              playerSession.isIdling = true;
-              if (playerSession instanceof NodeRtmpSession) {
-                playerSession.sendStreamStatus(STREAM_EOF, playerSession.playStreamId);
-              }
-            //} else {
-            //  Logger.log('onDeleteStream did NOT find redis.get(playerId)2 ', playerId)
-            //}
-          //});
+          let playerSession = context.sessions.get(playerId);
+          context.idlePlayers.add(playerId);
+          playerSession.isPlaying = false;
+          playerSession.isIdling = true;
+          if (playerSession instanceof NodeRtmpSession) {
+            playerSession.sendStreamStatus(STREAM_EOF, playerSession.playStreamId);
+          }
         }
 
-        redis.del(this.publishStreamPath);
+        context.publishers.delete(this.publishStreamPath);
         if (this.rtmpGopCacheQueue) {
           this.rtmpGopCacheQueue.clear();
         }
